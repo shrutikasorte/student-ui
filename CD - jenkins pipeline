@@ -1,0 +1,39 @@
+pipeline {
+    agent any
+
+    environment {
+        image_name = 'my_container'
+        tag = 'latest'
+        passwd = 'AWS ACCOUNT ID.dkr.ecr.ap-south-1.amazonaws.com'
+        region = 'ap-south-1'
+        ec2_user = 'ec2-user'
+        ec2_host = 'publicIP'
+        deployment_name = 'my-deploy'
+        container_name = 'my_container'
+    }
+
+    stages {
+        stage('SSH into EC2 and pull docker image') {
+            steps {
+                withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEYFILE')]) {
+                    sh """
+    chmod 600 \$KEYFILE
+    ssh -i \$KEYFILE -o StrictHostKeyChecking=no ${ec2_user}@${ec2_host} << 'EOF'
+sudo aws ecr get-login-password --region ${region} | sudo docker login --username AWS --password-stdin ${passwd}
+sudo docker pull ${passwd}/${image_name}:${tag}
+sudo docker images | grep ${image_name}
+kubectl set image deployment/my-deploy my-container=AWS ACCOUNT ID.dkr.ecr.ap-south-1.amazonaws.com/my_container:latest
+kubectl delete svc my-service --ignore-not-found
+kubectl expose deployment ${deployment_name} --type=LoadBalancer --name=my-service --port=80 --target-port=8080
+EOF
+"""
+                }
+            }
+        }
+    }
+}
+
+
+
+
+#http://a04cb03be93494114ace468b46fc22d9-1230223930.ap-south-1.elb.amazonaws.com/studentapp-2.2-SNAPSHOT/
