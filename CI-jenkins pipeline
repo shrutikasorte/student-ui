@@ -1,0 +1,56 @@
+pipeline {
+    agent any
+    environment {
+        region = 'ap-south-1'
+        ECR = 'AWS account ID.dkr.ecr.ap-south-1.amazonaws.com'
+    }
+
+    stages {
+        stage('checkout') {
+            steps {
+                git credentialsId: 'id', url: 'GIT URL'
+            }
+        }
+        stage('build') {
+            steps {
+                sh ' mvn clean package'
+            }
+        }
+        stage('SonarQube Analysis') {
+            environment {
+                // Define SONAR_HOST_URL and SONAR_AUTH_TOKEN if needed
+                SONAR_HOST_URL = 'public IP ADDRESS:9000'
+                SONAR_AUTH_TOKEN = credentials('sonar-id') // Jenkins credential ID
+            }
+            steps {
+                withSonarQubeEnv('sonarqube') { 
+                    // This matches the SonarQube server config name in Jenkins
+                    sh 'mvn sonar:sonar -Dsonar.projectKey=student-ui -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_AUTH_TOKEN'
+                }
+            }
+        }
+        stage('image build') {
+            steps {
+                sh 'sudo docker build -t my-image .'
+            }
+        }
+        stage('image scan') {
+            steps {
+               script{
+               sh  "sudo trivy image ${image_name}:${tag}"
+               }
+            }
+        }
+        stage('image push') {
+            steps {
+                sh '''
+                  sudo aws ecr get-login-password --region $region |sudo docker login --username AWS --password-stdin $ECR
+                  sudo docker tag my-image:latest $ECR/my_container:latest
+                  sudo docker push $ECR/my_container:latest
+
+                '''
+            }
+        }
+        
+    }
+}
