@@ -1,7 +1,4 @@
-FROM maven as builder
-COPY . /mnt/student-ui/.
-WORKDIR /mnt/student-ui
-RUN mvn package
-
-FROM tomcat 
-COPY --from=builder /mnt/student-ui/target/*.war webapps/.
+FROM tomcat
+EXPOSE 8080
+COPY target/*.war webapps/.
+CMD ["catalina.sh", "run"]
